@@ -1,0 +1,540 @@
+```react
+import React, { useState, useEffect, useRef } from 'react';
+import { Lock, User, CheckCircle, List, LogOut, ShieldCheck, BookOpen, ChevronLeft, ChevronRight, AlertTriangle, Send, Eye, XCircle, Clock, Heart } from 'lucide-react';
+
+const App = () => {
+  const [view, setView] = useState('welcome'); 
+  const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
+  const [examData, setExamData] = useState({
+    name: '',
+    answers: Array(100).fill(null),
+  });
+  const [timeLeft, setTimeLeft] = useState(100 * 60); // 100 menit dalam detik
+  const [isActive, setIsActive] = useState(false);
+  const [adminAuth, setAdminAuth] = useState({ user: '', pass: '' });
+  const [submissions, setSubmissions] = useState([]);
+  const [error, setError] = useState('');
+  const [showForceSubmitModal, setShowForceSubmitModal] = useState(false);
+  const [selectedSubmission, setSelectedSubmission] = useState(null);
+
+  const ADMIN_USER = 'admin';
+  const ADMIN_PASS = 'muaraman123';
+  const CREATOR_NAME = "Fadli Omi Raharjo";
+  const timerRef = useRef(null);
+
+  // Timer Logic
+  useEffect(() => {
+    if (isActive && timeLeft > 0) {
+      timerRef.current = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    } else if (timeLeft === 0 && isActive) {
+      clearInterval(timerRef.current);
+      finalizeSubmission("Waktu Habis");
+    }
+    return () => clearInterval(timerRef.current);
+  }, [isActive, timeLeft]);
+
+  const formatTime = (seconds) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h > 0 ? h + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const generateQuestions = () => {
+    const categories = ["AIK", "Manajerial", "Pedagogik", "Supervisi", "Sosial"];
+    let list = [];
+    for (let i = 0; i < 100; i++) {
+      const cat = categories[i % categories.length];
+      list.push({
+        id: i + 1,
+        category: cat,
+        q: `[Soal ${i + 1}] Bagaimana implementasi strategi kepemimpinan yang paling tepat dalam mengelola sumber daya sekolah di lingkungan Muhammadiyah untuk mencapai visi unggul dan berkemajuan?`,
+        options: [
+          "Melakukan penghematan anggaran tanpa memperhatikan kualitas program",
+          "Menerapkan transparansi dan akuntabilitas berbasis nilai-nilai Al-Ikhlas",
+          "Mendelegasikan semua urusan keuangan kepada bendahara tanpa kontrol",
+          "Menunggu bantuan dari Pimpinan Cabang tanpa ada inisiatif mandiri"
+        ],
+        correct: 1
+      });
+    }
+    list[0] = { id: 1, category: "AIK", q: "KH Ahmad Dahlan mendirikan Muhammadiyah pada tanggal 8 Dzulhijjah 1330 H, yang bertepatan dengan tanggal?", options: ["18 November 1912", "18 Desember 1912", "18 Oktober 1912", "18 Januari 1912"], correct: 0 };
+    list[1] = { id: 2, category: "Manajerial", q: "Dalam manajemen berbasis sekolah, keterlibatan masyarakat direpresentasikan melalui lembaga?", options: ["Komite Sekolah", "Majelis Dikdasmen", "Dewan Guru", "Pimpinan Cabang"], correct: 0 };
+    return list;
+  };
+
+  const [questions] = useState(generateQuestions());
+
+  const calculateScore = (userAnswers) => {
+    let correctCount = 0;
+    userAnswers.forEach((ans, idx) => {
+      if (ans === questions[idx].correct) correctCount++;
+    });
+    return correctCount;
+  };
+
+  const finalizeSubmission = (reason = "Selesai Normal") => {
+    setIsActive(false);
+    const rawScore = calculateScore(examData.answers);
+    const newSubmission = {
+      id: Date.now(),
+      name: examData.name || "Anonim",
+      score: rawScore,
+      userAnswers: [...examData.answers],
+      answeredCount: examData.answers.filter(a => a !== null).length,
+      time: new Date().toLocaleString(),
+      status: reason,
+      durationSpent: formatTime((100 * 60) - timeLeft)
+    };
+
+    setSubmissions(prev => [...prev, newSubmission]);
+    setView('result_sent');
+    setShowForceSubmitModal(false);
+  };
+
+  const handleStartExam = () => {
+    if (!examData.name.trim()) return alert("Masukkan nama terlebih dahulu");
+    setIsActive(true);
+    setView('exam');
+  };
+
+  const handleFinishExam = () => {
+    const unanswered = examData.answers.filter(a => a === null).length;
+    if (unanswered > 0) {
+      setShowForceSubmitModal(true);
+    } else {
+      finalizeSubmission();
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-100 p-2 md:p-6 font-sans">
+      <div className="max-w-6xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
+        
+        {/* Header Section */}
+        <div className="bg-emerald-900 p-4 md:p-6 text-white flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-4">
+            <div className="bg-white p-2 rounded-xl">
+               <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Muhammadiyah_Logo.svg/1200px-Muhammadiyah_Logo.svg.png" className="w-8 h-8 object-contain" alt="Logo" />
+            </div>
+            <div>
+              <h1 className="text-lg md:text-xl font-bold leading-tight uppercase tracking-tight">Seleksi Kepala Sekolah</h1>
+              <p className="text-emerald-300 text-[10px] tracking-widest font-semibold uppercase italic">Buatan {CREATOR_NAME}</p>
+            </div>
+          </div>
+          
+          {view === 'exam' && (
+            <div className="flex items-center gap-3">
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-2xl border ${timeLeft < 600 ? 'bg-red-500 border-red-400 animate-pulse' : 'bg-emerald-800 border-emerald-700'}`}>
+                <Clock size={18} />
+                <span className="text-xl font-mono font-bold">{formatTime(timeLeft)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 md:p-10">
+          {/* Welcome Screen */}
+          {view === 'welcome' && (
+            <div className="py-12 text-center max-w-lg mx-auto">
+              <div className="bg-emerald-50 w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg border border-emerald-100">
+                <BookOpen className="text-emerald-600" size={48} />
+              </div>
+              <h2 className="text-3xl font-black text-slate-800 mb-2 leading-none">Selamat Datang</h2>
+              <p className="text-emerald-600 text-sm font-bold uppercase tracking-widest mb-6">Sistem Seleksi Terpadu</p>
+              
+              <div className="bg-slate-50 p-6 rounded-2xl border-2 border-dashed border-slate-200 mb-8">
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="text-center">
+                      <p className="text-[10px] font-black text-slate-400 uppercase">Durasi</p>
+                      <p className="font-bold text-slate-700">100 Menit</p>
+                   </div>
+                   <div className="text-center">
+                      <p className="text-[10px] font-black text-slate-400 uppercase">Jumlah Soal</p>
+                      <p className="font-bold text-slate-700">100 Butir</p>
+                   </div>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <input 
+                  type="text" 
+                  className="w-full p-5 bg-white border-2 border-slate-100 rounded-2xl focus:border-emerald-500 outline-none transition-all text-center text-xl font-bold uppercase shadow-sm"
+                  placeholder="INPUT NAMA LENGKAP"
+                  value={examData.name}
+                  onChange={(e) => setExamData({...examData, name: e.target.value})}
+                />
+                <button 
+                  onClick={handleStartExam}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-5 rounded-2xl shadow-xl transition-all transform hover:scale-[1.01] text-lg uppercase tracking-wider"
+                >
+                  MULAI UJIAN
+                </button>
+                
+                <div className="pt-4 space-y-2">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter flex items-center justify-center gap-1">
+                    Dikembangkan Oleh <span className="text-slate-600">{CREATOR_NAME}</span>
+                  </p>
+                  <button onClick={() => setView('admin_login')} className="text-emerald-600 text-xs font-bold hover:underline">Panel Kontrol Majelis</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Exam Screen */}
+          {view === 'exam' && (
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 animate-in fade-in duration-500">
+              <div className="lg:col-span-1 order-2 lg:order-1">
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 sticky top-6">
+                  <h4 className="text-[10px] font-black text-slate-400 mb-4 uppercase tracking-widest flex justify-between">
+                    <span>Nomor Soal</span>
+                    <span>{examData.answers.filter(a => a !== null).length}/100</span>
+                  </h4>
+                  <div className="grid grid-cols-5 gap-1.5 max-h-[450px] overflow-y-auto pr-1">
+                    {questions.map((_, i) => (
+                      <button 
+                        key={i}
+                        onClick={() => setCurrentQuestionIdx(i)}
+                        className={`aspect-square text-[10px] font-bold rounded-lg flex items-center justify-center transition-all border ${
+                          currentQuestionIdx === i ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-100' : 
+                          examData.answers[i] !== null ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-white text-slate-400 border-slate-200 hover:border-emerald-300'
+                        }`}
+                      >
+                        {i + 1}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="lg:col-span-3 order-1 lg:order-2 space-y-6">
+                <div className="bg-white min-h-[400px]">
+                  <div className="flex items-center justify-between mb-6">
+                    <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider">
+                      BIDANG: {questions[currentQuestionIdx].category}
+                    </span>
+                    <div className="flex items-center gap-4">
+                      <button 
+                         onClick={() => setShowForceSubmitModal(true)}
+                         className="text-[10px] font-black text-red-500 hover:bg-red-50 px-3 py-1 rounded-lg transition-all border border-red-100"
+                      >
+                        SELESAI MANUAL
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-10">
+                    <h3 className="text-xl md:text-2xl font-bold text-slate-800 leading-snug">
+                      <span className="text-emerald-600 font-black mr-2">Soal {currentQuestionIdx + 1}.</span> 
+                      {questions[currentQuestionIdx].q}
+                    </h3>
+                  </div>
+
+                  <div className="grid gap-3">
+                    {questions[currentQuestionIdx].options.map((opt, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          const n = [...examData.answers];
+                          n[currentQuestionIdx] = i;
+                          setExamData({...examData, answers: n});
+                        }}
+                        className={`group text-left p-5 rounded-2xl border-2 transition-all flex items-center gap-4 ${
+                          examData.answers[currentQuestionIdx] === i
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm ring-1 ring-emerald-500'
+                          : 'border-slate-100 bg-white hover:border-emerald-200'
+                        }`}
+                      >
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black transition-all ${
+                          examData.answers[currentQuestionIdx] === i ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600'
+                        }`}>
+                          {String.fromCharCode(65 + i)}
+                        </div>
+                        <span className="text-base font-semibold leading-tight">{opt}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-10 border-t border-slate-100">
+                  <button 
+                    disabled={currentQuestionIdx === 0}
+                    onClick={() => setCurrentQuestionIdx(v => v - 1)}
+                    className="flex items-center gap-2 font-black text-sm text-slate-400 hover:text-emerald-600 disabled:opacity-20 transition-all uppercase"
+                  >
+                    <ChevronLeft size={20} /> Sebelumnya
+                  </button>
+
+                  {currentQuestionIdx === 99 ? (
+                    <button 
+                      onClick={handleFinishExam}
+                      className="bg-emerald-600 text-white px-12 py-4 rounded-2xl font-black shadow-xl hover:bg-emerald-700 flex items-center gap-2 uppercase tracking-widest animate-pulse"
+                    >
+                      KIRIM <Send size={18} />
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => setCurrentQuestionIdx(v => v + 1)}
+                      className="flex items-center gap-2 px-10 py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg hover:bg-emerald-700 transition-all uppercase tracking-widest"
+                    >
+                      Lanjut <ChevronRight size={20} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Result Sent Screen */}
+          {view === 'result_sent' && (
+            <div className="py-24 text-center max-w-md mx-auto">
+              <div className="bg-emerald-500 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-emerald-100">
+                <CheckCircle className="text-white" size={56} />
+              </div>
+              <h2 className="text-3xl font-black text-slate-800 mb-2">Jawaban Tersimpan</h2>
+              <p className="text-slate-500 leading-relaxed font-medium">Terima kasih telah berpartisipasi dalam seleksi Majelis Dikdasmen PNF.</p>
+              <div className="mt-12 p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                 <p className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest">Sertifikasi Sistem</p>
+                 <p className="text-sm font-bold text-slate-600 italic">"Pendidikan yang memajukan adalah pendidikan yang berlandaskan kejujuran."</p>
+                 <p className="text-[10px] mt-4 font-black text-emerald-600">— {CREATOR_NAME}</p>
+              </div>
+              <button 
+                onClick={() => { window.location.reload(); }}
+                className="mt-10 px-10 py-4 bg-slate-900 text-white font-black rounded-2xl transition-all shadow-xl hover:bg-black"
+              >
+                KELUAR SISTEM
+              </button>
+            </div>
+          )}
+
+          {/* Admin Dashboard */}
+          {view === 'admin_dashboard' && (
+            <div className="space-y-8 animate-in fade-in duration-700">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <h2 className="text-3xl font-black text-slate-800 tracking-tighter">Panel Rekapitulasi</h2>
+                  <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">Administrator Majelis Dikdasmen PNF</p>
+                </div>
+                <button onClick={() => setView('welcome')} className="bg-red-50 text-red-600 px-6 py-3 rounded-2xl font-black text-xs flex items-center gap-2 hover:bg-red-100 transition-all">
+                  <LogOut size={18} /> LOGOUT
+                </button>
+              </div>
+
+              {!selectedSubmission ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 shadow-sm">
+                       <p className="text-emerald-600 text-[10px] font-black uppercase mb-1 tracking-widest">Total Peserta</p>
+                       <p className="text-4xl font-black text-emerald-900">{submissions.length}</p>
+                    </div>
+                    <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 shadow-sm">
+                       <p className="text-blue-600 text-[10px] font-black uppercase mb-1 tracking-widest">Rata-rata Skor</p>
+                       <p className="text-4xl font-black text-blue-900">
+                        {submissions.length > 0 ? (submissions.reduce((a,b)=>a+b.score,0)/submissions.length).toFixed(1) : 0}
+                       </p>
+                    </div>
+                    <div className="bg-slate-900 p-6 rounded-3xl shadow-xl">
+                       <p className="text-emerald-400 text-[10px] font-black uppercase mb-1 tracking-widest">Sistem Pengembang</p>
+                       <p className="text-lg font-black text-white">{CREATOR_NAME}</p>
+                       <p className="text-[10px] text-slate-400">Versi Final (Multi-Audit)</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-md">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            <th className="p-6">Data Peserta</th>
+                            <th className="p-6 text-center">Terisi</th>
+                            <th className="p-6 text-center">Betul</th>
+                            <th className="p-6 text-center">Durasi</th>
+                            <th className="p-6 text-center">Status</th>
+                            <th className="p-6 text-center">Skor</th>
+                            <th className="p-6">Detail</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {submissions.map(s => (
+                            <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="p-6">
+                                <p className="font-black text-slate-800 uppercase text-sm tracking-tight">{s.name}</p>
+                                <p className="text-[9px] text-slate-400 font-bold">{s.time}</p>
+                              </td>
+                              <td className="p-6 text-center font-bold text-slate-500">{s.answeredCount}/100</td>
+                              <td className="p-6 text-center font-bold text-emerald-600">{s.score}</td>
+                              <td className="p-6 text-center font-bold text-blue-600 text-xs">{s.durationSpent}</td>
+                              <td className="p-6 text-center">
+                                <span className={`text-[8px] font-black uppercase px-2 py-1 rounded ${s.status === 'Waktu Habis' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                                  {s.status}
+                                </span>
+                              </td>
+                              <td className="p-6 text-center">
+                                <span className="bg-slate-900 text-white px-4 py-2 rounded-xl font-black text-base shadow-sm">{s.score}</span>
+                              </td>
+                              <td className="p-6">
+                                <button onClick={() => setSelectedSubmission(s)} className="p-3 text-emerald-600 bg-emerald-50 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm">
+                                  <Eye size={20} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {submissions.length === 0 && (
+                            <tr><td colSpan="7" className="p-20 text-center text-slate-300 italic font-bold">Belum ada peserta yang mengumpulkan jawaban.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* Submission Detail (The Audit View) */
+                <div className="bg-white rounded-3xl border-2 border-slate-900 overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+                   <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
+                     <div>
+                        <h3 className="text-xl font-black tracking-tight uppercase">{selectedSubmission.name}</h3>
+                        <p className="text-emerald-400 text-[10px] font-black uppercase tracking-[0.3em]">Lembar Hasil Audit</p>
+                     </div>
+                     <button onClick={() => setSelectedSubmission(null)} className="bg-white/10 hover:bg-white/20 px-6 py-2 rounded-xl font-black text-xs uppercase transition-all">Tutup Audit</button>
+                   </div>
+                   
+                   <div className="p-8 grid grid-cols-2 md:grid-cols-4 gap-6 bg-slate-50 border-b border-slate-200">
+                      <div className="text-center bg-white p-4 rounded-2xl border border-slate-200">
+                        <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Benar</p>
+                        <p className="text-3xl font-black text-emerald-600">{selectedSubmission.score}</p>
+                      </div>
+                      <div className="text-center bg-white p-4 rounded-2xl border border-slate-200">
+                        <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Salah</p>
+                        <p className="text-3xl font-black text-red-500">{100 - selectedSubmission.score}</p>
+                      </div>
+                      <div className="text-center bg-white p-4 rounded-2xl border border-slate-200">
+                        <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Terjawab</p>
+                        <p className="text-3xl font-black text-blue-600">{selectedSubmission.answeredCount}</p>
+                      </div>
+                      <div className="text-center bg-white p-4 rounded-2xl border border-slate-200">
+                        <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Durasi</p>
+                        <p className="text-3xl font-black text-slate-800">{selectedSubmission.durationSpent}</p>
+                      </div>
+                   </div>
+
+                   <div className="p-6 max-h-[600px] overflow-y-auto space-y-4 bg-white custom-scrollbar">
+                      {questions.map((q, idx) => {
+                        const userAns = selectedSubmission.userAnswers[idx];
+                        const isCorrect = userAns === q.correct;
+                        return (
+                          <div key={q.id} className={`p-4 rounded-2xl border-2 transition-all ${userAns === null ? 'bg-slate-50 border-slate-200' : isCorrect ? 'bg-emerald-50/40 border-emerald-100' : 'bg-red-50/40 border-red-100'}`}>
+                            <div className="flex justify-between items-start gap-4 mb-3">
+                              <p className="text-sm font-bold text-slate-800 leading-snug">
+                                <span className="text-slate-400 mr-2 font-black">#{q.id}</span> {q.q}
+                              </p>
+                              <div className="shrink-0">
+                                {userAns === null ? (
+                                  <span className="text-[8px] font-black px-2 py-1 bg-slate-200 text-slate-500 rounded uppercase tracking-widest">Kosong</span>
+                                ) : isCorrect ? (
+                                  <span className="text-[8px] font-black px-2 py-1 bg-emerald-500 text-white rounded uppercase tracking-widest flex items-center gap-1"><CheckCircle size={10}/> Betul</span>
+                                ) : (
+                                  <span className="text-[8px] font-black px-2 py-1 bg-red-500 text-white rounded uppercase tracking-widest flex items-center gap-1"><XCircle size={10}/> Salah</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                               <div className="p-3 bg-white/50 rounded-xl border border-slate-100">
+                                  <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Jawaban Peserta</p>
+                                  <p className={`font-black ${isCorrect ? 'text-emerald-700' : userAns === null ? 'text-slate-400 italic' : 'text-red-700'}`}>
+                                    {userAns === null ? "Tidak menjawab" : `${String.fromCharCode(65 + userAns)}. ${q.options[userAns]}`}
+                                  </p>
+                               </div>
+                               {!isCorrect && (
+                                 <div className="p-3 bg-white/50 rounded-xl border border-blue-100">
+                                    <p className="text-[9px] font-black text-blue-400 uppercase mb-1">Kunci Jawaban</p>
+                                    <p className="font-black text-blue-700">
+                                      {String.fromCharCode(65 + q.correct)}. {q.options[q.correct]}
+                                    </p>
+                                 </div>
+                               )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                   </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Admin Login View */}
+          {view === 'admin_login' && (
+            <div className="max-w-xs mx-auto py-12 space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+              <div className="text-center">
+                <div className="bg-slate-900 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-slate-200">
+                  <ShieldCheck className="text-white" size={40} />
+                </div>
+                <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Login Majelis</h2>
+                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Otoritas Khusus Dikdasmen PNF</p>
+              </div>
+              <div className="space-y-4">
+                <input 
+                  type="text" className="w-full p-4 border-2 border-slate-100 rounded-2xl font-bold focus:border-slate-900 outline-none transition-all" placeholder="Username" 
+                  onChange={e => setAdminAuth({...adminAuth, user: e.target.value})}
+                />
+                <input 
+                  type="password" className="w-full p-4 border-2 border-slate-100 rounded-2xl font-bold focus:border-slate-900 outline-none transition-all" placeholder="Password" 
+                  onChange={e => setAdminAuth({...adminAuth, pass: e.target.value})}
+                />
+                <button 
+                  onClick={() => {
+                    if (adminAuth.user === ADMIN_USER && adminAuth.pass === ADMIN_PASS) {
+                      setView('admin_dashboard');
+                      setError('');
+                    } else setError("Akses Ditolak: Password Salah");
+                  }}
+                  className="w-full bg-slate-900 hover:bg-black text-white font-black py-4 rounded-2xl shadow-xl transition-all active:scale-95 shadow-slate-200"
+                >
+                  MASUK DASHBOARD
+                </button>
+                {error && <p className="text-red-500 text-[10px] text-center font-black uppercase tracking-widest">{error}</p>}
+                <button onClick={() => setView('welcome')} className="w-full text-slate-400 text-xs font-bold uppercase tracking-widest">Kembali</button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Modal: Manual Finalize */}
+        {showForceSubmitModal && (
+          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-[2rem] max-w-sm w-full p-10 shadow-2xl animate-in zoom-in-90 duration-300">
+              <div className="bg-red-50 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <AlertTriangle className="text-red-500" size={48} />
+              </div>
+              <h3 className="text-2xl font-black text-center mb-4 leading-tight text-slate-800">Akhiri Ujian?</h3>
+              <p className="text-slate-500 text-center text-sm mb-8 font-medium">
+                Sisa soal belum dijawab akan otomatis dianggap salah. Tindakan ini tidak dapat dibatalkan.
+              </p>
+              <div className="space-y-3">
+                <button onClick={() => finalizeSubmission("Diakhiri Manual")} className="w-full bg-red-500 hover:bg-red-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-red-100 transition-all uppercase tracking-widest text-xs">YA, AKHIRI SEKARANG</button>
+                <button onClick={() => setShowForceSubmitModal(false)} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-black py-4 rounded-2xl transition-all uppercase tracking-widest text-xs">BATALKAN</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Dynamic Footer with Creator Attribution */}
+        <div className="bg-slate-50 p-4 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-2">
+           <div className="flex items-center gap-2">
+             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Sistem Seleksi Dikdasmen PNF</span>
+           </div>
+           <div className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+             Dikembangkan dengan <Heart size={10} className="text-red-500 fill-red-500" /> oleh <span className="text-emerald-700 ml-1">{CREATOR_NAME}</span>
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default App;
+
+```
